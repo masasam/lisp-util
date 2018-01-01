@@ -14,3 +14,12 @@
 
 (defun mklist (obj)
   (if (listp obj) obj (list obj)))
+
+(defun longer (x y)
+  (labels ((compare (x y)
+	     (and (consp x)
+		  (or (null y)
+		      (compare (cdr x) (cdr y))))))
+    (if (and (listp x) (listp y))
+	(compare x x)
+	(> (length x) (length y)))))
