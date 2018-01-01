@@ -47,3 +47,23 @@
                    ((atom x) (cons x acc))
                    (t (rec (car x) (rec (cdr x) acc))))))
     (rec x nil)))
+
+(defun prune (test tree)
+  (labels ((rec (tree acc)
+             (cond ((null tree) (nreverse acc))
+                   ((consp (car tree))
+                    (rec (cdr tree)
+                         (cons (rec (car tree) nil) acc)))
+                   (t (rec (cdr tree)
+                           (if (funcall test (car tree))
+                               acc
+                               (cons (car tree) acc)))))))
+    (rec tree nil)))
+
+(defun find2 (fn lst)
+  (if (null lst)
+      nil
+      (let ((val (funcall fn (car lst))))
+        (if val
+            (values (car lst) val)
+            (find2 fn (cdr lst))))))
