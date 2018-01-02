@@ -311,3 +311,15 @@
        (cond ,@(mapcar #'(lambda (cl)
                            (condlet-clause vars cl bodfn))
                        clauses)))))
+
+(defun condlet-clause (vars cl bodfn)
+  `(,(car cl) (let ,(mapcar #'cdr vars)
+                (let ,(condlet-binds vars cl)
+                  (,bodfn ,@(mapcar #'cdr vars))))))
+
+(defun condlet-binds (vars cl)
+  (mapcar #'(lambda (bindform)
+              (if (consp bindform)
+                  (cons (cdr (assoc (car bindform) vars))
+                        (cdr bindform))))
+          (cdr cl)))
