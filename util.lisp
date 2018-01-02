@@ -228,3 +228,21 @@
       (let ((chain (apply #'fint fns)))
         #'(lambda (x)
             (and (funcall fn x) (funcall chain x))))))
+
+(defun fun (fn &rest fns)
+  (if (null fns)
+      fn
+      (let ((chain (apply #'fun fns)))
+        #'(lambda (x)
+            (or (funcall fn x) (funcall chain x))))))
+
+(defun lrec (rec &optional base)
+  (labels ((self (lst)
+             (if (null lst)
+                 (if (functionp base)
+                     (funcall base)
+                     base)
+                 (funcall rec (car lst)
+			  #'(lambda ()
+			      (self (cdr lst)))))))
+    #'self))
