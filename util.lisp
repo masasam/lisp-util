@@ -1205,3 +1205,96 @@
 		       (pick-process))
 	    :pri   ,pri)
 	   *procs*)))
+
+(defmacro program (name args &body body)
+  `(=defun ,name ,args
+	   (setq *procs* nil)
+	   ,@body
+	   (catch *halt* (loop (pick-process)))))
+
+(defun pick-process ()
+  (multiple-value-bind (p val) (most-urgent-process)
+    (setq *proc*  p
+          *procs* (delete p *procs*))
+    (funcall (proc-state p) val)))
+
+(defun most-urgent-process ()
+  (let ((proc1 *default-proc*) (max -1) (val1 t))
+    (dolist (p *procs*)
+      (let ((pri (proc-pri p)))
+        (if (> pri max)
+            (let ((val (or (not (proc-wait p))
+                           (funcall (proc-wait p)))))
+              (when val
+                (setq proc1 p
+                      max   pri
+                      val1  val))))))
+    (values proc1 val1)))
+
+(defun arbitrator (test cont)
+  (setf (proc-state *proc*) cont
+        (proc-wait *proc*)  test)
+  (push *proc* *procs*)
+  (pick-process))
+
+(defmacro wait (parm test &body body)
+  `(arbitrator #'(lambda () ,test)
+               #'(lambda (,parm) ,@body)))
+
+(defmacro yield (&body body)
+  `(arbitrator nil #'(lambda (,(gensym)) ,@body)))
+
+(defun setpri (n) (setf (proc-pri *proc*) n))
+
+(defun halt (&optional val) (throw *halt* val))
+
+(defun kill (&optional obj &rest args)
+  (if obj
+      (setq *procs* (apply #'delete obj *procs* args))
+      (pick-process)))
+
+(defvar *open-doors* nil)
+
+(=defun pedestrian ()
+	(wait d (car *open-doors*)
+	      (format t "Entering ~A~%" d)))
+
+(program ped ()
+	 (fork (pedestrian) 1))
+
+(=defun capture (city)
+	(take city)
+	(setpri 1)
+	(yield
+	 (fortify city)))
+
+(=defun plunder (city)
+	(loot city)
+	(ransom city))
+
+(defun take (c)    (format t "Liberating ~A.~%" c))
+(defun fortify (c) (format t "Rebuilding ~A.~%" c))
+(defun loot (c)    (format t "Nationalizing ~A.~%" c))
+(defun ransom (c)  (format t "Refinancing ~A.~%" c))
+
+(program barbarians ()
+	 (fork (capture 'rome) 100)
+	 (fork (plunder 'rome) 98))
+
+(defmacro defnode (name &rest arcs)
+  `(=defun ,name (pos regs) (choose ,@arcs)))
+
+(defmacro down (sub next &rest cmds)
+  `(=bind (* pos regs) (,sub pos (cons nil regs))
+	  (,next pos ,(compile-cmds cmds))))
+
+(defmacro cat (cat next &rest cmds)
+  `(if (= (length *sent*) pos)
+       (fail)
+       (let ((* (nth pos *sent*)))
+         (if (member ',cat (types *))
+             (,next (1+ pos) ,(compile-cmds cmds))
+             (fail)))))
+
+(defmacro jump (next &rest cmds)
+  `(,next pos ,(compile-cmds cmds)))
