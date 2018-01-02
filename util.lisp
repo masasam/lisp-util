@@ -1143,3 +1143,65 @@
        (defmacro ,name ,parms
          `(,',f *cont* ,,@parms))
        (defun ,f (*cont* ,@parms) ,@body))))
+
+(defmacro =bind (parms expr &body body)
+  `(let ((*cont* #'(lambda ,parms ,@body))) ,expr))
+
+(defmacro =values (&rest retvals)
+  `(funcall *cont* ,@retvals))
+
+(defmacro =funcall (fn &rest args)
+  `(funcall ,fn *cont* ,@args))
+
+(defmacro =apply (fn &rest args)
+  `(apply ,fn *cont* ,@args))
+
+(defparameter *paths* nil)
+(defconstant failsym '@)
+
+(defmacro choose (&rest choices)
+  (if choices
+      `(progn
+         ,@(mapcar #'(lambda (c)
+                       `(push #'(lambda () ,c) *paths*))
+                   (reverse (cdr choices)))
+         ,(car choices))
+      '(fail)))
+
+(defmacro choose-bind (var choices &body body)
+  `(cb #'(lambda (,var) ,@body) ,choices))
+
+(defun cb (fn choices)
+  (if choices
+      (progn
+	(if (cdr choices)
+	    (push #'(lambda () (cb fn (cdr choices)))
+		  *paths*))
+	(funcall fn (car choices)))
+      (fail)))
+
+(defun fail ()
+  (if *paths*
+      (funcall (pop *paths*))
+      failsym))
+
+(defstruct proc  pri state wait)
+
+(proclaim '(special *procs* *proc*))
+
+(defvar *halt* (gensym))
+
+(defvar *default-proc*
+  (make-proc :state #'(lambda (x)
+			(format t "~%>> ")
+			(princ (eval (read)))
+			(pick-process))))
+
+(defmacro fork (expr pri)
+  `(prog1 ',expr
+     (push (make-proc
+	    :state #'(lambda (,(gensym))
+		       ,expr
+		       (pick-process))
+	    :pri   ,pri)
+	   *procs*)))
