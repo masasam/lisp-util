@@ -299,3 +299,15 @@
                      `(,s (gensym)))
                  syms)
      ,@body))
+
+(defmacro condlet (clauses &body body)
+  (let ((bodfn (gensym))
+        (vars (mapcar #'(lambda (v) (cons v (gensym)))
+                      (remove-duplicates
+		       (mapcar #'car
+			       (mappend #'cdr clauses))))))
+    `(labels ((,bodfn ,(mapcar #'car vars)
+		,@body))
+       (cond ,@(mapcar #'(lambda (cl)
+                           (condlet-clause vars cl bodfn))
+                       clauses)))))
