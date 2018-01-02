@@ -246,3 +246,38 @@
 			  #'(lambda ()
 			      (self (cdr lst)))))))
     #'self))
+
+(defun rfind-if (fn tree)
+  (if (atom tree)
+      (and (funcall fn tree) tree)
+      (or (rfind-if fn (car tree))
+          (if (cdr tree) (rfind-if fn (cdr tree))))))
+
+(defun ttrav (rec &optional (base #'identity))
+  (labels ((self (tree)
+             (if (atom tree)
+                 (if (functionp base)
+                     (funcall base tree)
+                     base)
+                 (funcall rec (self (car tree))
+			  (if (cdr tree)
+			      (self (cdr tree)))))))
+    #'self))
+
+(defun trec (rec &optional (base #'identity))
+  (labels
+      ((self (tree)
+	 (if (atom tree)
+	     (if (functionp base)
+		 (funcall base tree)
+		 base)
+	     (funcall rec tree
+		      #'(lambda ()
+			  (self (car tree)))
+		      #'(lambda ()
+			  (if (cdr tree)
+			      (self (cdr tree))))))))
+    #'self))
+
+(defmacro mac (expr)
+  `(pprint (macroexpand-1 ',expr)))
