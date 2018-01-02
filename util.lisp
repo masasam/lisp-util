@@ -336,3 +336,21 @@
        (cond ((plusp ,g) ,pos)
              ((zerop ,g) ,zero)
              (t ,neg)))))
+
+(defmacro in (obj &rest choices)
+  (let ((insym (gensym)))
+    `(let ((,insym ,obj))
+       (or ,@(mapcar #'(lambda (c) `(eql ,insym ,c))
+                     choices)))))
+
+(defmacro inq (obj &rest args)
+  `(in ,obj ,@(mapcar #'(lambda (a)
+                          `',a)
+                      args)))
+
+(defmacro in-if (fn &rest choices)
+  (let ((fnsym (gensym)))
+    `(let ((,fnsym ,fn))
+       (or ,@(mapcar #'(lambda (c)
+                         `(funcall ,fnsym ,c))
+                     choices)))))
