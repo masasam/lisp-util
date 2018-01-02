@@ -1298,3 +1298,49 @@
 
 (defmacro jump (next &rest cmds)
   `(,next pos ,(compile-cmds cmds)))
+
+(defun compile-cmds (cmds)
+  (if (null cmds)
+      'regs
+      `(,@(car cmds) ,(compile-cmds (cdr cmds)))))
+
+(defmacro up (expr)
+  `(let ((* (nth pos *sent*)))
+     (=values ,expr pos (cdr regs))))
+
+(defmacro getr (key &optional (regs 'regs))
+  `(let ((result (cdr (assoc ',key (car ,regs)))))
+     (if (cdr result) result (car result))))
+
+(defmacro set-register (key val regs)
+  `(cons (cons (cons ,key ,val) (car ,regs))
+         (cdr ,regs)))
+
+(defmacro setr (key val regs)
+  `(set-register ',key (list ,val) ,regs))
+
+(defmacro pushr (key val regs)
+  `(set-register ',key
+                 (cons ,val (cdr (assoc ',key (car ,regs))))
+                 ,regs))
+
+(defmacro with-parses (node sent &body body)
+  (with-gensyms (pos regs)
+    `(progn
+       (setq *sent* ,sent)
+       (setq *paths* nil)
+       (=bind (parse ,pos ,regs) (,node 0 '(nil))
+	      (if (= ,pos (length *sent*))
+		  (progn ,@body (fail))
+		  (fail))))))
+
+(defun types (word)
+  (case word
+    ((do does did) '(aux v))
+    ((time times) '(n v))
+    ((fly flies) '(n v))
+    ((like) '(v prep))
+    ((liked likes) '(v))
+    ((a an the) '(det))
+    ((arrow arrows) '(n))
+    ((i you he she him her it) '(pron))))
