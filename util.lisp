@@ -1001,3 +1001,55 @@
                        `(,gelse))))))
 
 (defun simple? (x) (or (atom x) (eq (car x) 'quote)))
+
+(defun gen-match (refs then else)
+  (if (null refs)
+      then
+      (let ((then (gen-match (cdr refs) then else)))
+        (if (simple? (caar refs))
+            (match1 refs then else)
+            (gen-match (car refs) then else)))))
+
+(defun match1 (refs then else)
+  (dbind ((pat expr) . rest) refs
+	 (cond ((gensym? pat)
+		`(let ((,pat ,expr))
+		   (if (and (typep ,pat 'sequence)
+			    ,(length-test pat rest))
+		       ,then
+		       ,else)))
+	       ((eq pat '_) then)
+	       ((var? pat)
+		(let ((ge (gensym)))
+		  `(let ((,ge ,expr))
+		     (if (or (gensym? ,pat) (equal ,pat ,ge))
+			 (let ((,pat ,ge)) ,then)
+			 ,else))))
+	       (t `(if (equal ,pat ,expr) ,then ,else)))))
+
+(defun gensym? (s)
+  (and (symbolp s) (not (symbol-package s))))
+
+(defun length-test (pat rest)
+  (let ((fin (caadar (last rest))))
+    (if (or (consp fin) (eq fin 'elt))
+        `(= (length ,pat) ,(length rest))
+        `(> (length ,pat) ,(- (length rest) 2)))))
+
+(defun make-db (&optional (size 100))
+  (make-hash-table :size size))
+
+(defvar *default-db* (make-db))
+
+(defun clear-db (&optional (db *default-db*))
+  (clrhash db))
+
+(defmacro db-query (key &optional (db '*default-db*))
+  `(gethash ,key ,db))
+
+(defun db-push (key val &optional (db *default-db*))
+  (push val (db-query key db)))
+
+(defmacro fact (pred &rest args)
+  `(progn (db-push ',pred ',args)
+          ',args))
