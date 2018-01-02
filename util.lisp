@@ -656,3 +656,67 @@
          (aif2 ,test
                (progn ,@body)
                (setq ,flag nil))))))
+
+(defmacro acond2 (&rest clauses)
+  (if (null clauses)
+      nil
+      (let ((cl1 (car clauses))
+            (val (gensym))
+            (win (gensym)))
+        `(multiple-value-bind (,val ,win) ,(car cl1)
+           (if (or ,val ,win)
+               (let ((it ,val)) ,@(cdr cl1))
+               (acond2 ,@(cdr clauses)))))))
+
+(let ((g (gensym)))
+  (defun read2 (&optional (str *standard-input*))
+    (let ((val (read str nil g)))
+      (unless (equal val g) (values val t)))))
+
+(defmacro do-file (filename &body body)
+  (let ((str (gensym)))
+    `(with-open-file (,str ,filename)
+       (awhile2 (read2 ,str)
+		,@body))))
+
+(defmacro fn (expr) `#',(rbuild expr))
+
+(defun rbuild (expr)
+  (if (or (atom expr) (eq (car expr) 'lambda))
+      expr
+      (if (eq (car expr) 'compose)
+          (build-compose (cdr expr))
+          (build-call (car expr) (cdr expr)))))
+
+(defun build-call (op fns)
+  (let ((g (gensym)))
+    `(lambda (,g)
+       (,op ,@(mapcar #'(lambda (f)
+                          `(,(rbuild f) ,g))
+                      fns)))))
+
+(defun build-compose (fns)
+  (let ((g (gensym)))
+    `(lambda (,g)
+       ,(labels ((rec (fns)
+                   (if fns
+                       `(,(rbuild (car fns))
+			  ,(rec (cdr fns)))
+                       g)))
+          (rec fns)))))
+
+(defmacro alrec (rec &optional base)
+  "cltl2 version"
+  (let ((gfn (gensym)))
+    `(lrec #'(lambda (it ,gfn)
+               (symbol-macrolet ((rec (funcall ,gfn)))
+                 ,rec))
+           ,base)))
+
+(defmacro alrec (rec &optional base)
+  "cltl1 version"
+  (let ((gfn (gensym)))
+    `(lrec #'(lambda (it ,gfn)
+               (labels ((rec () (funcall ,gfn)))
+                 ,rec))
+           ,base)))
