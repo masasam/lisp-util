@@ -1344,3 +1344,128 @@
     ((a an the) '(det))
     ((arrow arrows) '(n))
     ((i you he she him her it) '(pron))))
+
+(defnode mods
+    (cat n mods/n
+	 (setr mods *)))
+
+(defnode mods/n
+    (cat n mods/n
+	 (pushr mods *))
+  (up `(n-group ,(getr mods))))
+
+(defnode np
+    (cat det np/det
+	 (setr det *))
+  (jump np/det
+	(setr det nil))
+  (cat pron  pron
+       (setr n *)))
+
+(defnode pron
+    (up `(np (pronoun ,(getr n)))))
+
+(defnode np/det
+    (down mods np/mods
+	  (setr mods *))
+  (jump np/mods
+	(setr mods nil)))
+
+(defnode np/mods
+    (cat n np/n
+	 (setr n *)))
+
+(defnode np/n
+    (up `(np (det ,(getr det))
+	     (modifiers ,(getr mods))
+	     (noun ,(getr n))))
+  (down pp np/pp
+	(setr pp *)))
+
+(defnode np/pp
+    (up `(np (det ,(getr det))
+	     (modifiers ,(getr mods))
+	     (noun ,(getr n))
+	     ,(getr pp))))
+
+(defnode pp
+    (cat prep pp/prep
+	 (setr prep *)))
+
+(defnode pp/prep
+    (down np pp/np
+	  (setr op *)))
+
+(defnode pp/np
+    (up `(pp (prep ,(getr prep))
+	     (obj ,(getr op)))))
+
+(defnode s
+    (down np s/subj
+	  (setr mood 'decl)
+	  (setr subj *))
+  (cat v v
+       (setr mood 'imp)
+       (setr subj '(np (pron you)))
+       (setr aux nil)
+       (setr v *)))
+
+(defnode s/subj
+    (cat v v
+	 (setr aux nil)
+	 (setr v *)))
+
+(defnode v
+    (up `(s (mood ,(getr mood))
+	    (subj ,(getr subj))
+	    (vcl (aux ,(getr aux))
+		 (v ,(getr v)))))
+  (down np s/obj
+	(setr obj *)))
+
+(defnode s/obj
+    (up `(s (mood ,(getr mood))
+	    (subj ,(getr subj))
+	    (vcl (aux ,(getr aux))
+		 (v ,(getr v)))
+	    (obj ,(getr obj)))))
+
+(defmacro with-inference (query &body body)
+  `(progn
+     (setq *paths* nil)
+     (=bind (binds) (prove-query ',(rep_ query) nil)
+	    (let ,(mapcar #'(lambda (v)
+			      `(,v (fullbind ',v binds)))
+			  (vars-in query #'atom))
+	      ,@body
+	      (fail)))))
+
+(defun rep_ (x)
+  (if (atom x)
+      (if (eq x '_) (gensym "?") x)
+      (cons (rep_ (car x)) (rep_ (cdr x)))))
+
+(defun fullbind (x b)
+  (cond ((varsym? x) (aif2 (binding x b)
+                           (fullbind it b)
+                           (gensym)))
+        ((atom x) x)
+        (t (cons (fullbind (car x) b)
+                 (fullbind (cdr x) b)))))
+
+(defun varsym? (x)
+  (and (symbolp x) (eq (char (symbol-name x) 0) #\?)))
+
+(defmacro with-inference (query &rest body)
+  (let ((vars (vars-in query #'simple?)) (gb (gensym)))
+    `(with-gensyms ,vars
+       (setq *paths* nil)
+       (=bind (,gb) ,(gen-query (rep_ query))
+	      (let ,(mapcar #'(lambda (v)
+				`(,v (fullbind ,v ,gb)))
+			    vars)
+		,@body)
+	      (fail)))))
+
+(defun varsym? (x)
+  (and (symbolp x) (not (symbol-package x))))
